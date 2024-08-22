@@ -1,0 +1,127 @@
+// This Pine Script™ code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © looikaizhi0305
+
+//@version=5
+
+indicator("顶底结构", overlay=true)
+import TradingView/ta/7
+
+// 定义移动平均线的周期
+short_ma_length = input.int(5, title="短期指数移动平均线周期")
+mid_ma_length = input.int(10, title="中期指数移动平均线周期")
+long_ma_length = input.int(20, title="长期指数移动平均线周期")
+
+// 计算EMA
+short_ma = ta.ema(close, short_ma_length)
+mid_ma = ta.ema(close, mid_ma_length)
+long_ma = ta.ema(close, long_ma_length)
+
+// 绘制移动平均线
+plot(short_ma, color=color.blue, title="短期指数移动平均线")
+plot(mid_ma, color=color.orange, title="中期指数移动平均线")
+plot(long_ma, color=color.red, title="长期指数移动平均线")
+
+// 定义变量以存储高点和低点
+var float start_high = na
+var float start_low = na
+var int start_index = na
+var int main_index = na
+var int end_index = na
+
+// 记录上一个顶部或底部结构的点
+var float previous_point = na
+var int previous_index = na
+
+// 蜡烛颜色
+up = close > open
+down = close < open
+
+// 分为两步
+var bool first_structure = false
+var bool top0bottom1 = false // top = 0; bottom = 1
+var int wait_counter = 0 // 计数器
+
+if(wait_counter == 0 and not first_structure)
+    // 极端条件    
+    extreme_condition = high > high[1] and low < low[1]
+
+    // 顶部构造条件
+    condition1 = up[2] and up[1]
+    condition2 = down
+    condition3 = high < high[1]
+    top_condition = condition1 and condition2 and (condition3 or extreme_condition)
+
+    // 底部构造条件
+    condition4 = down[2] and down[1]
+    condition5 = up
+    condition6 = low > low[1]
+    bottom_condition = condition4 and condition5 and (condition6 or extreme_condition)
+
+    // 顶部 or 底部
+    if(top_condition or bottom_condition)
+        if(top_condition)
+            top0bottom1 := false
+        else
+            top0bottom1 := true
+        
+        // 获取顶部或底部的起始位置
+        start_index := bar_index[2]
+        first_structure := true
+        if(extreme_condition)
+            start_high := high
+            start_low := low
+            main_index:= bar_index
+        else
+            start_high := high[1]
+            start_low := low[1]
+            main_index := bar_index[1]
+        
+
+// 确定顶底构造的完整性
+if(first_structure)
+    // 底部结构
+    if(top0bottom1)
+        if(low < start_low)
+            first_structure := false
+        
+        else if(high > start_high)
+            end_index := bar_index
+            first_structure := false
+            
+            // 绘制顶部结构
+            box.new(left=start_index, top=high, right=end_index, bottom=start_low, border_color=color.blue, border_width=2, bgcolor=color.new(color.blue, 90))
+            label.new((start_index + end_index)/2, start_low, text = "底部构造", color = color.blue, style = label.style_label_up, textcolor = color.white)
+
+            if(not na(previous_index))
+                line.new(x1 = previous_index, y1 = previous_point, x2 = main_index, y2 = start_low, color = color.black, width = 2)
+
+            previous_index := main_index
+            previous_point := start_low
+
+            // 等待三次蜡烛
+            wait_counter := 3
+    // 顶部构造
+    else
+        if(high > start_high)
+            first_structure := false
+
+        else if(low < start_low)
+            end_index := bar_index
+            first_structure := false
+
+            // 绘制顶部结构
+            box.new(left=start_index, top=start_high, right=end_index, bottom=low, border_color=color.red, border_width=2, bgcolor=color.new(color.red, 90))
+            label.new((start_index + end_index)/2, start_high, text = "顶部构造", color = color.red, style = label.style_label_down, textcolor = color.white)
+
+            if(not na(previous_index))
+                line.new(x1 = previous_index, y1 = previous_point, x2 = main_index, y2 = start_high, color = color.black, width = 2)
+
+            previous_index := main_index
+            previous_point := start_high
+
+            // 等待三次蜡烛
+            wait_counter := 3
+
+if(wait_counter > 0)
+    wait_counter := wait_counter - 1
+    
